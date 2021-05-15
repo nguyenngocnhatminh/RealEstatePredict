@@ -1,0 +1,9 @@
+Flask
+pandas
+torch
+fastai
+
+click==7.1.2
+numpy==1.19.2
+typing-extensions==3.7.4.3
+tensorflow
