@@ -3,11 +3,6 @@ import utils
 
 app = Flask(__name__)
 
-
-@app.route("/")
-def hello():
-    return render_template('index.html')
-
 @app.route("/predict/lstm/<int:region_id>", methods = ["GET"])
 def lstmPrediction(region_id):
     data = utils.lstmPrediction(region_id)
