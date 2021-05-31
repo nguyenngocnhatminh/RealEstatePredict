@@ -110,117 +110,39 @@ def Moving_Avage(regionID):
     print(data)
     return data
 
-def Linear_Regression(region_id):
-    #Lấy dữ liệu đã được clean
+def Prophet(region_id):
+    #import require libraries
+    from fbprophet import Prophet
+    #Lấy dữ liệu được clean vào
     data = GetDataByRegion(region_id)
+    #Fomat data
     time = data['Time'].tolist()
-
-    #Tạo feature(đặc trưng dùng để dự đoán) Ở dataset này thì chỉ có 2 cột nên mình bỏ qua bước này
-    add_datepart(data, 'Time')
-    #Chia dữ liệu ra
+    data['Time'] = pd.to_datetime(data.Time, format='%Y/%m/%d')
+    data.index = data['Time']
+    #Chuẩn bị dữ liệu
+    data.rename(columns={'Value': 'y', 'Time': 'ds'}, inplace=True)
+    #Chia dữ liệu
     train = data[:240]
     valid = data[240:]
-    #x sẽ giứ mốc thời gian và các đặc trưng, y sẽ giữ value
-    x_train = train.drop('Value', axis=1)
-    y_train = train['Value']
-    x_valid = valid.drop('Value', axis=1)
-    y_valid = valid['Value']
-    # Thực thi thuật toán linear regression bằng thư viện sklearn
-    from sklearn.linear_model import LinearRegression
-    model = LinearRegression()
-    model.fit(x_train, y_train)
-    #Tạo giá trị dự đoán dựa trên model đã tạo
-    preds = model.predict(x_valid)
-    mape = np.mean(np.abs((valid['Value'] - preds)/valid['Value']))*100
-    print("Linear Regression")
+    #Sử dụng thư viện Prophet để tạo model
+    model = Prophet(daily_seasonality=True)
+    model.fit(train)
+    # Dự đoán
+    close_prices = model.make_future_dataframe(periods=len(valid))
+    forecast = model.predict(close_prices)
+    forecast_valid = forecast['yhat'][240:]
+    mape = np.mean(np.abs((valid['y'].values - forecast_valid.values) / valid['y'].values))*100
+    print("Prophet")
     print("mape")
     print(mape)
+    data.rename(columns={'y': 'Value', 'ds': 'Time'}, inplace=True)
     data['Time'] = time
+    data.index = data['Time']
     train = data[:240]
     valid = data[240:]
-    #Vẽ biểu đồ
-    data = change_to_json(train,valid, preds)
+    data = change_to_json_from_model(train,valid,forecast_valid.values)
     print(data)
     return data
-
-def K_Nearest_Neibours(region_id):
-    # importing libraries
-    from sklearn import neighbors
-    from sklearn.model_selection import GridSearchCV
-    from sklearn.preprocessing import MinMaxScaler
-    scaler = MinMaxScaler(feature_range=(0, 1))
-    # Lấy dữ liệu đã được clean
-    data = GetDataByRegion(region_id)
-    time = data['Time'].tolist()
-    add_datepart(data, 'Time')
-    # Chia dữ liệu ra
-    train = data[:240]
-    valid = data[240:]
-    # x sẽ giứ mốc thời gian, y sẽ giữ value
-    x_train = train.drop('Value', axis=1)
-    y_train = train['Value']
-    x_valid = valid.drop('Value', axis=1)
-    y_valid = valid['Value']
-
-    # scaling data
-    x_train_scaled = scaler.fit_transform(x_train)
-    x_train = pd.DataFrame(x_train_scaled)
-    x_valid_scaled = scaler.fit_transform(x_valid)
-    x_valid = pd.DataFrame(x_valid_scaled)
-
-    # using gridsearch to find the best parameter
-    params = {'n_neighbors': [2, 3, 4, 5, 6, 7, 8, 9]}
-    knn = neighbors.KNeighborsRegressor()
-    model = GridSearchCV(knn, params, cv=5)
-    # fit the model and make predictions
-    model.fit(x_train, y_train)
-    preds = model.predict(x_valid)
-    #Vẽ biểu đồ
-    mape = np.mean(np.abs((valid['Value'] - preds) / valid['Value']))*100
-    print("K nearest neibours")
-    print("mape")
-    print(mape)
-
-    data['Time'] = time
-    train = data[:240]
-    valid = data[240:]
-
-    data = change_to_json(train,valid,preds)
-    return data
-#
-# def Prophet(region_id):
-#     #import require libraries
-#     from fbprophet import Prophet
-#     #Lấy dữ liệu được clean vào
-#     data = GetDataByRegion(region_id)
-#     #Fomat data
-#     time = data['Time'].tolist()
-#     data['Time'] = pd.to_datetime(data.Time, format='%Y/%m/%d')
-#     data.index = data['Time']
-#     #Chuẩn bị dữ liệu
-#     data.rename(columns={'Value': 'y', 'Time': 'ds'}, inplace=True)
-#     #Chia dữ liệu
-#     train = data[:240]
-#     valid = data[240:]
-#     #Sử dụng thư viện Prophet để tạo model
-#     model = Prophet(daily_seasonality=True)
-#     model.fit(train)
-#     # Dự đoán
-#     close_prices = model.make_future_dataframe(periods=len(valid))
-#     forecast = model.predict(close_prices)
-#     forecast_valid = forecast['yhat'][240:]
-#     mape = np.mean(np.abs((valid['y'].values - forecast_valid.values) / valid['y'].values))*100
-#     print("Prophet")
-#     print("mape")
-#     print(mape)
-#     data.rename(columns={'y': 'Value', 'ds': 'Time'}, inplace=True)
-#     data['Time'] = time
-#     data.index = data['Time']
-#     train = data[:240]
-#     valid = data[240:]
-#     data = change_to_json_from_model(train,valid,forecast_valid.values)
-#     print(data)
-#     return data
 
 
 def lstmPrediction(regionID):
@@ -275,10 +197,6 @@ def lstmPrediction(regionID):
     train = data[:240]
     valid = data[240:]
     print(valid)
-    valid['Predictions'] = closing_price
-    plt.plot(train['Value'])
-    plt.plot(valid[['Value', 'Predictions']])
-    plt.show()
     data = []
     print(valid)
     for i in range(0, len(train)):
@@ -302,3 +220,4 @@ def lstmPrediction(regionID):
             }
         )
     return data
+
